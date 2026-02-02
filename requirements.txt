@@ -1,0 +1,12 @@
+yt-dlp
+faster-whisper
+spacy
+transformers
+torch
+bertopic
+sentence-transformers
+streamlit
+pandas
+duckdb
+plotly
+wordcloud
