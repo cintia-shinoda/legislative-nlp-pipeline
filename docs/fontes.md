@@ -10,10 +10,20 @@
 
 
 ## Seleção para o MVP
-- Fonte: Câmara Municipal de São Paulo
-- Playlists: 2025 + 2026 (115 vídeos disponíveis no momento)
+
+| # | Sessão | Data | Duração | Tamanho |
+|---|--------|------|---------|---------|
+| 1 | Sessão Plenária | 22/10/2025 | 2h12min | 1.4 GB |
+| 2 | Sessão Plenária | 04/11/2025 | 1h45min | 1.1 GB |
+| 3 | Sessão Plenária | 05/11/2025 | 1h46min | 1.1 GB |
+| 4 | Sessão Plenária | 11/11/2025 | 1h42min | 1.1 GB |
+| 5 | Sessão Plenária | 12/11/2025 | 2h54min | 1.9 GB |
+| 6 | Sessão Plenária | 25/11/2025 | 2h05min | 1.4 GB |
+| **Total** | | | **12h28min** | **8.0 GB** |
+
 - Critério: sessões plenárias completas, priorizando vídeos de 1-3h
 - Meta: 5-8 vídeos (~10-15h de áudio total)
+- Armazenamento: .wav (sem compressão) + metadados no DuckDB (data/catalogo.duckdb)
 
 ## Critérios de exclusão
 - Vídeos < 30min (homenagens, sessões solenes)
