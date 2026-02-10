@@ -10,3 +10,5 @@ pandas
 duckdb
 plotly
 wordcloud
+sentencepiece
+tiktoken
