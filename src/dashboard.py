@@ -230,3 +230,50 @@ try:
 
 except ImportError:
     st.warning("Instale wordcloud: pip install wordcloud")
+
+# ============================================================
+#              SEÇÃO 8 — HEATMAP TEMPORAL
+# ============================================================
+st.header("Heatmap Temporal: Sessão × Tópico")
+
+top10_topics = df_topics['topic_name'].value_counts().head(10).index.tolist()
+df_temporal = df_topics[df_topics['topic_name'].isin(top10_topics)]
+
+temporal_cross = pd.crosstab(
+    df_temporal['sessao'],
+    df_temporal['topic_name'],
+)
+
+fig_temporal = px.imshow(
+    temporal_cross,
+    color_continuous_scale='YlOrRd',
+    aspect='auto',
+    text_auto=True,
+)
+fig_temporal.update_layout(height=500, xaxis_tickangle=-45)
+st.plotly_chart(fig_temporal, use_container_width=True)
+
+# ============================================================
+#              SEÇÃO 9 — RESUMO POR SESSÃO
+# ============================================================
+st.header("Resumo por Sessão")
+
+summary = df_filtered.groupby('sessao').agg(
+    segmentos=('text', 'count'),
+    confianca_media=('confianca', 'mean'),
+    pct_positivo=('sentimento', lambda x: (x == 'positivo').mean()),
+    pct_neutro=('sentimento', lambda x: (x == 'neutro').mean()),
+    pct_negativo=('sentimento', lambda x: (x == 'negativo').mean()),
+).round(2)
+
+summary.columns = ['Segmentos', 'Confiança Média', '% Positivo', '% Neutro', '% Negativo']
+
+st.dataframe(
+    summary.style.format({
+        'Confiança Média': '{:.0%}',
+        '% Positivo': '{:.0%}',
+        '% Neutro': '{:.0%}',
+        '% Negativo': '{:.0%}',
+    }),
+    use_container_width=True,
+)
