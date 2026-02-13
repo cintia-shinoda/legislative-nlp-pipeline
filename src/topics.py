@@ -5,8 +5,6 @@ Para executar: python src/topics.py
 """
 
 from bertopic import BERTopic
-from hdbscan import HDBSCAN
-from umap import UMAP
 import pandas as pd
 import duckdb
 from pathlib import Path
@@ -19,41 +17,19 @@ def create_topic_model():
     """
     Cria e configura o modelo BERTopic.
     
-    Usa UMAP e HDBSCAN como modelos externos para ter controle total
-    dos hiperparâmetros (em vez de depender dos defaults do BERTopic).
-    
     Retorna:
         BERTopic: modelo configurado (ainda não treinado)
     """
     print('Criando modelo BERTopic...')
     
-    # UMAP: redução de dimensionalidade dos embeddings
-    # random_state=42 garante reprodutibilidade
-    umap_model = UMAP(
-        n_components=5,
-        n_neighbors=15,
-        min_dist=0.0,
-        metric='cosine',
-        random_state=42,
-    )
-    
-    # HDBSCAN: clusterização baseada em densidade
-    # min_cluster_size=30: mínimo de segmentos para formar um tópico
-    # min_samples=5: reduz exigência de densidade → menos outliers
-    hdbscan_model = HDBSCAN(
-        min_cluster_size=50,
-        min_samples=5,
-        metric='euclidean',
-        prediction_data=True,
-    )
-    
     topic_model = BERTopic(
         embedding_model='paraphrase-multilingual-MiniLM-L12-v2',
-        umap_model=umap_model,
-        hdbscan_model=hdbscan_model,
+        min_topic_size=40,   # 40 segmentos mínimos por tópico
+                            # regra prática: min_topic_size = 0.5% a 1% do total de documentos
+                            # 9.239 * 0.5% = ~46, arredonda para 40
         nr_topics='auto',
         language='portuguese',
-        verbose=False,
+        verbose=False  # False para não poluir o output no batch
     )
     
     print('Modelo criado!')
@@ -156,14 +132,14 @@ def analyze_topics_all_sessions(topic_model, input_dir='data/output', output_dir
         count = row['Count']
         name = topic_names.get(tid, 'desconhecido')
         if tid == -1:
-            print(f'Outliers: {count} segmentos')
+            print(f'  Outliers: {count} segmentos')
         else:
             print(f'  #{tid:>2d} ({count:>3d} segs) → {name}')
     
     # Cruzamento tópico × sentimento
     print()
     print('='*60)
-    print('          CRUZAMENTO: Tópico × Sentimento          ')
+    print('CRUZAMENTO: Tópico × Sentimento')
     print('='*60)
     print()
     
@@ -222,7 +198,7 @@ if __name__ == '__main__':
     DB_PATH = 'data/catalogo.duckdb'
     
     print('='*60)
-    print('          Extração de Tópicos — BERTopic          ')
+    print('              Extração de Tópicos — BERTopic')
     print(f'   Início: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
     print('='*60)
     print()
@@ -239,7 +215,7 @@ if __name__ == '__main__':
     
     print()
     print('='*60)
-    print('                         RESUMO          ')
+    print('                          RESUMO')
     print('='*60)
     print(f'   Segmentos processados: {stats["total_segmentos"]:,}')
     print(f'   Tópicos encontrados: {stats["total_topicos"]}')

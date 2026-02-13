@@ -2,43 +2,43 @@
   "modelo": "large-v3",
   "device": "cpu",
   "compute_type": "int8",
-  "inicio": "2026-03-08 06:03:20",
-  "tempo_total_segundos": 26407.4,
+  "inicio": "2026-02-11 06:34:08",
+  "tempo_total_segundos": 24275.8,
   "resultados": [
     {
       "arquivo": "Sessao_Plenaria_04_11_2025",
-      "segmentos": 2637,
-      "duracao_transcricao": 4338.4,
+      "segmentos": 2581,
+      "duracao_transcricao": 4451.0,
       "output_path": "data/processed/Sessao_Plenaria_04_11_2025.parquet"
     },
     {
       "arquivo": "Sessao_Plenaria_05_11_2025",
-      "segmentos": 1112,
-      "duracao_transcricao": 3782.1,
+      "segmentos": 1136,
+      "duracao_transcricao": 3294.3,
       "output_path": "data/processed/Sessao_Plenaria_05_11_2025.parquet"
     },
     {
       "arquivo": "Sessao_Plenaria_11_11_2025",
-      "segmentos": 1550,
-      "duracao_transcricao": 2570.3,
+      "segmentos": 925,
+      "duracao_transcricao": 2316.2,
       "output_path": "data/processed/Sessao_Plenaria_11_11_2025.parquet"
     },
     {
       "arquivo": "Sessao_Plenaria_12_11_2025",
-      "segmentos": 2952,
-      "duracao_transcricao": 7021.1,
+      "segmentos": 3133,
+      "duracao_transcricao": 6690.7,
       "output_path": "data/processed/Sessao_Plenaria_12_11_2025.parquet"
     },
     {
       "arquivo": "Sessao_Plenaria_22_10_2025",
-      "segmentos": 1767,
-      "duracao_transcricao": 3207.0,
+      "segmentos": 1824,
+      "duracao_transcricao": 3102.2,
       "output_path": "data/processed/Sessao_Plenaria_22_10_2025.parquet"
     },
     {
       "arquivo": "Sessao_Plenaria_25_11_2025",
-      "segmentos": 1369,
-      "duracao_transcricao": 5486.1,
+      "segmentos": 1836,
+      "duracao_transcricao": 4420.9,
       "output_path": "data/processed/Sessao_Plenaria_25_11_2025.parquet"
     }
   ]

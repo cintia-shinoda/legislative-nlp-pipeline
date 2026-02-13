@@ -1,6 +1,6 @@
 """
 dashboard.py
-Dashboard interativo para visualização dos resultados da análise de sentimento e tópicos.
+Dashboard para visualização de sentimento e tópicos das sessões plenárias.
 Para executar: streamlit run src/dashboard.py
 """
 
@@ -10,270 +10,399 @@ import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
 
-# ============================================================
-#                 CONFIGURAÇÃO DA PÁGINA
-# ============================================================
-st.set_page_config(
-    page_title="Termômetro Legislativo",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
 
 # ============================================================
-#                     CARGA DE DADOS
+#              CONFIGURAÇÃO DA PÁGINA
 # ============================================================
+
+# st.set_page_config() DEVE ser o primeiro comando Streamlit
+# Configura título da aba, ícone e layout
+st.set_page_config(
+    page_title='Análise de Sentimento e Tópicos',
+    layout='wide',          # Usa largura total da tela
+    initial_sidebar_state='expanded'
+)
+
+
+# ============================================================
+#                 CARREGAMENTO DE DADOS
+# ============================================================
+
+# @st.cache_data faz o Streamlit cachear o resultado desta função
+# Na primeira vez, lê os arquivos. Nas próximas, usa o cache.
+# Isso evita reler os Parquets toda vez que o usuário interage com o dashboard.
 @st.cache_data
 def load_data():
     """Carrega todos os dados processados."""
-    df = pd.read_parquet('data/output/all_sessions_with_topics.parquet')
-    topic_info = pd.read_parquet('data/output/topic_info.parquet')
-    cross = pd.read_parquet('data/output/topic_sentiment_cross.parquet')
+    
+    data_dir = Path('data/output')
+    
+    # Dados principais: todos os segmentos com sentimento e tópicos
+    df = pd.read_parquet(data_dir / 'all_sessions_with_topics.parquet')
+    
+    # Info dos tópicos (nome, contagem)
+    topic_info = pd.read_parquet(data_dir / 'topic_info.parquet')
+    
+    # Cruzamento tópico × sentimento
+    cross = pd.read_parquet(data_dir / 'topic_sentiment_cross.parquet')
+    
+    # Extrair data da sessão a partir do nome
+    # 'Sessao_Plenaria_22_10_2025' → '2025-10-22'
+    def extract_date(name):
+        parts = name.split('_')
+        # parts = ['Sessao', 'Plenaria', '22', '10', '2025']
+        if len(parts) >= 5:
+            day, month, year = parts[2], parts[3], parts[4]
+            return f'{year}-{month}-{day}'
+        return name
+    
+    df['data_sessao'] = df['sessao'].apply(extract_date)
+    df['data_sessao'] = pd.to_datetime(df['data_sessao'])
+    
     return df, topic_info, cross
 
+
+# Carregar dados
 df, topic_info, cross = load_data()
 
-# ============================================================
-#                   SIDEBAR — FILTROS
-# ============================================================
-st.sidebar.title("Termômetro Legislativo")
-st.sidebar.markdown("---")
 
-# Filtro por sessão
-sessoes = sorted(df['sessao'].unique())
-sessoes_sel = st.sidebar.multiselect(
-    "Sessões",
-    options=sessoes,
-    default=sessoes,
+# ============================================================
+#                      SIDEBAR (filtros)
+# ============================================================
+
+# st.sidebar cria elementos na barra lateral
+st.sidebar.title('Filtros')
+
+# Filtro de sessão
+# st.sidebar.multiselect() cria um seletor de múltiplas opções
+# sorted() + unique() lista todas as sessões únicas em ordem
+sessoes_disponiveis = sorted(df['sessao'].unique())
+
+# Formatar nomes para exibição (mais legível)
+sessao_labels = {s: s.replace('Sessao_Plenaria_', '').replace('_', '/') for s in sessoes_disponiveis}
+
+sessoes_selecionadas = st.sidebar.multiselect(
+    'Sessões:',
+    options=sessoes_disponiveis,
+    default=sessoes_disponiveis,          # Todas selecionadas por padrão
+    format_func=lambda x: sessao_labels[x]  # Mostra '22/10/2025' em vez do nome completo
 )
 
-# Filtro por sentimento
-sentimentos_sel = st.sidebar.multiselect(
-    "Sentimento",
+# Filtro de sentimento
+sentimentos = st.sidebar.multiselect(
+    'Sentimento:',
     options=['positivo', 'neutro', 'negativo'],
-    default=['positivo', 'neutro', 'negativo'],
+    default=['positivo', 'neutro', 'negativo']
 )
+
+# Filtro de tópico (excluir outliers por padrão)
+incluir_outliers = st.sidebar.checkbox('Incluir outliers (sem tópico)', value=False)
 
 # Aplicar filtros
+# .isin() verifica se cada valor está na lista fornecida
 df_filtered = df[
-    (df['sessao'].isin(sessoes_sel)) &
-    (df['sentimento'].isin(sentimentos_sel))
-]
+    (df['sessao'].isin(sessoes_selecionadas)) &
+    (df['sentimento'].isin(sentimentos))
+].copy()
+
+if not incluir_outliers:
+    df_filtered = df_filtered[df_filtered['topic_id'] != -1]
+
+# Sempre remover tópico #0 (catch-all genérico) dos gráficos
+# Ele contém 59% dos segmentos e não tem tema definido
+incluir_catchall = st.sidebar.checkbox('Incluir tópico genérico (#0)', value=False)
+if not incluir_catchall:
+    df_filtered = df_filtered[df_filtered['topic_id'] != 0]
+
 
 # ============================================================
-#               SEÇÃO 1 — MÉTRICAS GERAIS
+#                       HEADER
 # ============================================================
-st.title("Análise de Sentimento e Tópicos")
-st.markdown("Análise automatizada de sentimento e tópicos — Câmara Municipal de São Paulo")
-st.markdown("---")
 
+st.title('Análise de Sentimento e Tópicos')
+st.markdown('**Câmara Municipal de São Paulo** — Análise de sentimento e tópicos das sessões plenárias')
+st.markdown('---')
+
+
+# ============================================================
+#                 MÉTRICAS GERAIS (cards)
+# ============================================================
+
+# st.columns(4) cria 4 colunas lado a lado
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("Sessões", len(sessoes_sel))
-col2.metric("Segmentos", f"{len(df_filtered):,}")
-col3.metric("Tópicos", len(topic_info) - 1)  # -1 exclui outliers
-col4.metric("Confiança Média", f"{df_filtered['confianca'].mean():.0%}")
+
+# st.metric() cria um card com número grande
+# É o widget ideal para KPIs (Key Performance Indicators)
+with col1:
+    st.metric('Sessões', len(df_filtered['sessao'].unique()))
+
+with col2:
+    st.metric('Segmentos', f'{len(df_filtered):,}')
+
+with col3:
+    st.metric('Tópicos', df_filtered[df_filtered['topic_id'] != -1]['topic_id'].nunique())
+
+with col4:
+    # Confiança média do modelo de sentimento
+    avg_conf = df_filtered['confianca'].mean()
+    st.metric('Confiança média', f'{avg_conf:.0%}')
+
+st.markdown('---')
+
 
 # ============================================================
-#           SEÇÃO 2 — DISTRIBUIÇÃO DE SENTIMENTO
+#        LINHA 1: Distribuição de sentimento + Timeline
 # ============================================================
-st.header("Distribuição de Sentimento")
 
-col_donut, col_bars = st.columns(2)
+col_left, col_right = st.columns(2)
 
-with col_donut:
-    sent_counts = df_filtered['sentimento'].value_counts()
-    colors = {'positivo': '#059669', 'neutro': '#6B7280', 'negativo': '#DC2626'}
-    fig_donut = px.pie(
-        values=sent_counts.values,
-        names=sent_counts.index,
-        hole=0.5,
-        color=sent_counts.index,
-        color_discrete_map=colors,
+# --- Gráfico de pizza: distribuição geral de sentimento ---
+with col_left:
+    st.subheader('Distribuição de Sentimento')
+    
+    # value_counts() conta ocorrências de cada sentimento
+    sent_dist = df_filtered['sentimento'].value_counts()
+    
+    # Cores consistentes para cada sentimento
+    color_map = {
+        'positivo': '#2ecc71',    # Verde
+        'neutro': '#95a5a6',      # Cinza
+        'negativo': '#e74c3c',    # Vermelho
+    }
+    
+    fig_pie = px.pie(
+        names=sent_dist.index,
+        values=sent_dist.values,
+        color=sent_dist.index,
+        color_discrete_map=color_map,
+        hole=0.4,  # 0.4 = donut chart (anel). 0 = pizza sólida
     )
-    fig_donut.update_layout(height=400)
-    st.plotly_chart(fig_donut, use_container_width=True)
+    
+    # update_traces() customiza a aparência
+    # textinfo: o que mostrar em cada fatia
+    fig_pie.update_traces(textinfo='percent+label')
+    fig_pie.update_layout(showlegend=False, height=400)
+    
+    st.plotly_chart(fig_pie, use_container_width=True)
 
-with col_bars:
-    # Sentimento por sessão (barras empilhadas)
-    sent_by_session = df_filtered.groupby(['sessao', 'sentimento']).size().reset_index(name='count')
-    fig_bars = px.bar(
-        sent_by_session,
-        x='sessao', y='count', color='sentimento',
-        color_discrete_map=colors,
-        barmode='stack',
+# --- Gráfico de barras empilhadas: sentimento por sessão ---
+with col_right:
+    st.subheader('Sentimento por Sessão')
+    
+    # pd.crosstab() cria tabela cruzada sessão × sentimento
+    # normalize='index' faz cada sessão somar 100%
+    timeline = pd.crosstab(
+        df_filtered['data_sessao'].dt.strftime('%d/%m'),
+        df_filtered['sentimento'],
+        normalize='index'
+    ).round(3)
+    
+    # Reordenar colunas
+    cols_order = [c for c in ['positivo', 'neutro', 'negativo'] if c in timeline.columns]
+    timeline = timeline[cols_order]
+    
+    fig_timeline = px.bar(
+        timeline,
+        barmode='stack',          # Barras empilhadas (somam 100%)
+        color_discrete_map=color_map,
+        labels={'value': 'Proporção', 'index': 'Sessão'},
     )
-    fig_bars.update_layout(height=400, xaxis_tickangle=-45)
-    st.plotly_chart(fig_bars, use_container_width=True)
+    
+    fig_timeline.update_layout(
+        height=400,
+        yaxis_tickformat='.0%',   # Formatar eixo Y como percentual
+        legend_title_text='Sentimento',
+        xaxis_title='Data da sessão',
+        yaxis_title='Proporção',
+    )
+    
+    st.plotly_chart(fig_timeline, use_container_width=True)
+
+
+st.markdown('---')
+
 
 # ============================================================
-#           SEÇÃO 3 — HEATMAP TÓPICO × SENTIMENTO
+# LINHA 2: Heatmap Tópico × Sentimento (o CRUZAMENTO PRINCIPAL)
 # ============================================================
-st.header("Heatmap: Tópico × Sentimento")
 
-# Top 25 tópicos (excluindo outliers)
-df_topics = df_filtered[df_filtered['topic_id'] != -1]
-top_topics = df_topics['topic_name'].value_counts().head(25).index.tolist()
-df_top = df_topics[df_topics['topic_name'].isin(top_topics)]
+st.subheader('Termômetro: Tópico × Sentimento')
+st.markdown('*Cada linha é um tópico. As cores mostram a proporção de sentimento. Ordenado por % negativo (descendente).*')
 
-cross_filtered = pd.crosstab(
-    df_top['topic_name'],
-    df_top['sentimento'],
-    normalize='index',
-).round(2)
+# Recalcular cruzamento com dados filtrados (respeita os filtros da sidebar)
+df_topics_only = df_filtered[df_filtered['topic_id'] != -1].copy()
 
-cols_order = [c for c in ['positivo', 'neutro', 'negativo'] if c in cross_filtered.columns]
-cross_filtered = cross_filtered[cols_order]
-
-if 'negativo' in cross_filtered.columns:
+if len(df_topics_only) > 0:
+    cross_filtered = pd.crosstab(
+        df_topics_only['topic_name'],
+        df_topics_only['sentimento'],
+        normalize='index'
+    ).round(2)
+    
+    # Garantir que todas as colunas existam
+    for col in ['positivo', 'neutro', 'negativo']:
+        if col not in cross_filtered.columns:
+            cross_filtered[col] = 0.0
+    
+    cross_filtered = cross_filtered[['positivo', 'neutro', 'negativo']]
+    
+    # Ordenar por % negativo (mais negativo no topo)
     cross_filtered = cross_filtered.sort_values('negativo', ascending=True)
-
-fig_heat = px.imshow(
-    cross_filtered,
-    color_continuous_scale='RdYlGn_r',
-    aspect='auto',
-    text_auto='.0%',
-)
-fig_heat.update_layout(height=700)
-st.plotly_chart(fig_heat, use_container_width=True)
-
-# ============================================================
-#             SEÇÃO 4 — TÓPICOS MAIS FREQUENTES
-# ============================================================
-st.header("Tópicos Mais Frequentes")
-
-topic_counts = df_topics['topic_name'].value_counts().head(15).sort_values()
-fig_topics = px.bar(
-    x=topic_counts.values,
-    y=topic_counts.index,
-    orientation='h',
-    color=topic_counts.values,
-    color_continuous_scale='Blues',
-)
-fig_topics.update_layout(height=500, showlegend=False, yaxis_title='', xaxis_title='Segmentos')
-st.plotly_chart(fig_topics, use_container_width=True)
-
-# ============================================================
-#           SEÇÃO 5 — DISTRIBUIÇÃO DE CONFIANÇA
-# ============================================================
-st.header("Distribuição de Confiança do Modelo")
-
-fig_conf = px.histogram(
-    df_filtered, x='confianca', nbins=50,
-    color='sentimento', color_discrete_map=colors,
-    barmode='overlay', opacity=0.7,
-)
-fig_conf.update_layout(height=400, xaxis_title='Confiança', yaxis_title='Segmentos')
-st.plotly_chart(fig_conf, use_container_width=True)
-
-# ============================================================
-#            SEÇÃO 6 — EXPLORADOR DE SEGMENTOS
-# ============================================================
-st.header("Explorador de Segmentos")
-
-col_topic, col_sent = st.columns(2)
-with col_topic:
-    topic_filter = st.selectbox(
-        "Filtrar por tópico",
-        options=['Todos'] + sorted(df_topics['topic_name'].unique().tolist()),
+    
+    # Criar heatmap com Plotly
+    fig_heat = go.Figure(data=go.Heatmap(
+        z=cross_filtered.values,
+        x=['Positivo', 'Neutro', 'Negativo'],
+        y=cross_filtered.index,
+        # Escala de cores: branco (0%) → vermelho (100%)
+        colorscale='RdYlGn_r',   # Red-Yellow-Green reverso
+        text=[[f'{v:.0%}' for v in row] for row in cross_filtered.values],
+        texttemplate='%{text}',
+        textfont={'size': 11},
+        hovertemplate='Tópico: %{y}<br>Sentimento: %{x}<br>Proporção: %{text}<extra></extra>',
+    ))
+    
+    fig_heat.update_layout(
+        height=max(500, len(cross_filtered) * 35),  # Altura dinâmica baseada no nº de tópicos
+        yaxis={'dtick': 1},        # Mostrar todos os labels no eixo Y
+        xaxis_side='top',          # Labels do X no topo
     )
-with col_sent:
-    sent_filter = st.selectbox(
-        "Filtrar por sentimento",
-        options=['Todos', 'positivo', 'neutro', 'negativo'],
+    
+    st.plotly_chart(fig_heat, use_container_width=True)
+else:
+    st.warning('Nenhum segmento com tópico encontrado para os filtros selecionados.')
+
+
+st.markdown('---')
+
+
+# ============================================================
+#             LINHA 3: Top tópicos por volume
+# ============================================================
+
+st.subheader('Tópicos Mais Frequentes')
+
+if len(df_topics_only) > 0:
+    topic_counts = df_topics_only['topic_name'].value_counts().head(15)
+    
+    fig_bar = px.bar(
+        x=topic_counts.values,
+        y=topic_counts.index,
+        orientation='h',           # Barras horizontais
+        labels={'x': 'Segmentos', 'y': 'Tópico'},
+        color=topic_counts.values,
+        color_continuous_scale='Blues',
     )
+    
+    fig_bar.update_layout(
+        height=500,
+        yaxis={'categoryorder': 'total ascending'},  # Maior no topo
+        showlegend=False,
+        coloraxis_showscale=False,
+    )
+    
+    st.plotly_chart(fig_bar, use_container_width=True)
 
-df_explore = df_filtered.copy()
-if topic_filter != 'Todos':
-    df_explore = df_explore[df_explore['topic_name'] == topic_filter]
-if sent_filter != 'Todos':
-    df_explore = df_explore[df_explore['sentimento'] == sent_filter]
 
-st.dataframe(
-    df_explore[['text', 'sentimento', 'confianca', 'topic_name', 'sessao']]
-    .sort_values('confianca', ascending=False)
-    .head(100),
-    use_container_width=True,
-    height=400,
-)
-st.caption(f"Mostrando {min(100, len(df_explore))} de {len(df_explore):,} segmentos")
+st.markdown('---')
+
 
 # ============================================================
-#              SEÇÃO 7 — NUVEM DE PALAVRAS
+#             LINHA 4: Explorador de segmentos
 # ============================================================
-st.header("Nuvem de Palavras")
 
-try:
+st.subheader('Explorador de Segmentos')
+st.markdown('*Navegue pelos segmentos individuais. Use os filtros da sidebar para refinar.*')
+
+# Filtro adicional de tópico específico
+if len(df_topics_only) > 0:
+    topicos_disponiveis = ['Todos'] + sorted(df_filtered['topic_name'].dropna().unique().tolist())
+    topico_selecionado = st.selectbox('Filtrar por tópico:', topicos_disponiveis)
+    
+    df_explorer = df_filtered.copy()
+    if topico_selecionado != 'Todos':
+        df_explorer = df_explorer[df_explorer['topic_name'] == topico_selecionado]
+    
+    # Selecionar e renomear colunas para exibição
+    cols_display = {
+        'sessao': 'Sessão',
+        'start': 'Início (s)',
+        'end': 'Fim (s)',
+        'text': 'Texto',
+        'sentimento': 'Sentimento',
+        'confianca': 'Confiança',
+        'topic_name': 'Tópico',
+    }
+    
+    df_display = df_explorer[list(cols_display.keys())].rename(columns=cols_display)
+    
+    # Formatar sessão para exibição
+    df_display['Sessão'] = df_display['Sessão'].str.replace('Sessao_Plenaria_', '').str.replace('_', '/')
+    
+    # st.dataframe() cria uma tabela interativa (ordenável, pesquisável)
+    st.dataframe(
+        df_display,
+        use_container_width=True,
+        height=400,
+        column_config={
+            'Confiança': st.column_config.ProgressColumn(
+                min_value=0, max_value=1, format='%.0%%'
+            ),
+        }
+    )
+    
+    st.caption(f'Mostrando {len(df_display):,} segmentos')
+
+# ============================================================
+#         LINHA 5: WordCloud do tópico selecionado
+# ============================================================
+
+st.subheader('Nuvem de Palavras')
+
+if len(df_topics_only) > 0:
     from wordcloud import WordCloud
     import matplotlib.pyplot as plt
-
-    wc_topic = st.selectbox(
-        "Tópico para WordCloud",
-        options=['Todos (sem outliers)'] + sorted(df_topics['topic_name'].unique().tolist()),
-        key='wc_topic',
+    
+    topico_wc = st.selectbox(
+        'Tópico para wordcloud:',
+        options=sorted(df_filtered['topic_name'].dropna().unique().tolist()),
+        key='wc_topic'
     )
-
-    if wc_topic == 'Todos (sem outliers)':
-        wc_text = ' '.join(df_topics['text'].tolist())
+    
+    # Juntar todos os textos limpos do tópico selecionado
+    textos_topico = df_filtered[
+        df_filtered['topic_name'] == topico_wc
+    ]['text_clean'].str.cat(sep=' ')
+    
+    if textos_topico.strip():
+        wc = WordCloud(
+            width=800,
+            height=400,
+            background_color='white',
+            colormap='viridis',        # Paleta de cores
+            max_words=50,
+            collocations=False,        # Evita repetir bigramas
+        ).generate(textos_topico)
+        
+        fig_wc, ax = plt.subplots(figsize=(10, 5))
+        ax.imshow(wc, interpolation='bilinear')
+        ax.axis('off')
+        
+        # st.pyplot() renderiza figuras matplotlib no Streamlit
+        st.pyplot(fig_wc)
     else:
-        wc_text = ' '.join(df_topics[df_topics['topic_name'] == wc_topic]['text'].tolist())
+        st.info('Sem texto limpo disponível para este tópico.')
 
-    wc = WordCloud(
-        width=800, height=400,
-        background_color='white',
-        max_words=100,
-        colormap='viridis',
-    ).generate(wc_text)
 
-    fig_wc, ax = plt.subplots(figsize=(10, 5))
-    ax.imshow(wc, interpolation='bilinear')
-    ax.axis('off')
-    st.pyplot(fig_wc)
-
-except ImportError:
-    st.warning("Instale wordcloud: pip install wordcloud")
+st.markdown('---')
 
 # ============================================================
-#              SEÇÃO 8 — HEATMAP TEMPORAL
+#                      FOOTER
 # ============================================================
-st.header("Heatmap Temporal: Sessão × Tópico")
 
-top10_topics = df_topics['topic_name'].value_counts().head(10).index.tolist()
-df_temporal = df_topics[df_topics['topic_name'].isin(top10_topics)]
-
-temporal_cross = pd.crosstab(
-    df_temporal['sessao'],
-    df_temporal['topic_name'],
-)
-
-fig_temporal = px.imshow(
-    temporal_cross,
-    color_continuous_scale='YlOrRd',
-    aspect='auto',
-    text_auto=True,
-)
-fig_temporal.update_layout(height=500, xaxis_tickangle=-45)
-st.plotly_chart(fig_temporal, use_container_width=True)
-
-# ============================================================
-#              SEÇÃO 9 — RESUMO POR SESSÃO
-# ============================================================
-st.header("Resumo por Sessão")
-
-summary = df_filtered.groupby('sessao').agg(
-    segmentos=('text', 'count'),
-    confianca_media=('confianca', 'mean'),
-    pct_positivo=('sentimento', lambda x: (x == 'positivo').mean()),
-    pct_neutro=('sentimento', lambda x: (x == 'neutro').mean()),
-    pct_negativo=('sentimento', lambda x: (x == 'negativo').mean()),
-).round(2)
-
-summary.columns = ['Segmentos', 'Confiança Média', '% Positivo', '% Neutro', '% Negativo']
-
-st.dataframe(
-    summary.style.format({
-        'Confiança Média': '{:.0%}',
-        '% Positivo': '{:.0%}',
-        '% Neutro': '{:.0%}',
-        '% Negativo': '{:.0%}',
-    }),
-    use_container_width=True,
+st.markdown('---')
+st.markdown(
+    '*Análise de Sentimento e Tópicos | '
+    'Dados: Câmara Municipal de São Paulo | '
+    'Modelos: faster-whisper large-v3, cardiffnlp/xlm-roberta, BERTopic*'
 )
