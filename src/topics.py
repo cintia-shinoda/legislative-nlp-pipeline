@@ -22,14 +22,35 @@ def create_topic_model():
     """
     print('Criando modelo BERTopic...')
     
+    # DEPOIS:
+    from umap import UMAP
+    from hdbscan import HDBSCAN
+
+    # Fixar random_state para resultados reprodutíveis
+    # Sem isso, cada execução gera tópicos ligeiramente diferentes
+    # porque UMAP usa inicialização aleatória
+    umap_model = UMAP(
+        n_components=5,        # Reduzir para 5 dimensões (padrão BERTopic)
+        n_neighbors=15,        # Quantos vizinhos considerar (padrão)
+        min_dist=0.0,          # Clusters mais compactos
+        metric='cosine',       # Similaridade cosseno (melhor para texto)
+        random_state=42        # Semente fixa = reprodutibilidade
+    )
+
+    hdbscan_model = HDBSCAN(
+        min_cluster_size=40,   # Equivalente ao min_topic_size
+        min_samples=10,        # Mínimo de pontos densos para formar cluster
+        metric='euclidean',
+        prediction_data=True   # Necessário para probabilidades
+    )
+
     topic_model = BERTopic(
         embedding_model='paraphrase-multilingual-MiniLM-L12-v2',
-        min_topic_size=40,   # 40 segmentos mínimos por tópico
-                            # regra prática: min_topic_size = 0.5% a 1% do total de documentos
-                            # 9.239 * 0.5% = ~46, arredonda para 40
+        umap_model=umap_model,
+        hdbscan_model=hdbscan_model,
         nr_topics='auto',
         language='portuguese',
-        verbose=False  # False para não poluir o output no batch
+        verbose=False
     )
     
     print('Modelo criado!')
@@ -101,15 +122,18 @@ def analyze_topics_all_sessions(topic_model, input_dir='data/output', output_dir
     # Criar mapeamento de ID → nome legível
     # O BERTopic gera nomes como '5_paulo_são_cidade_jockey'
     # Vamos usar as palavras-chave como nome
+
     topic_names = {}
     for _, row in topic_info.iterrows():
         tid = row['Topic']
         if tid == -1:
             topic_names[tid] = 'Outlier (sem tópico)'
+        elif tid == 0:
+            # Tópico #0 renomeado — sub-clustering revelou que é
+            # majoritariamente discurso procedimental genérico
+            topic_names[tid] = 'Discurso geral / procedimental'
         else:
-            # row['Name'] tem formato '5_palavra1_palavra2_...'
-            # Pegamos só as palavras (sem o número)
-            name_parts = row['Name'].split('_')[1:5]  # Primeiras 4 palavras
+            name_parts = row['Name'].split('_')[1:5]
             topic_names[tid] = ' | '.join(name_parts)
     
     # Adicionar nome do tópico ao DataFrame

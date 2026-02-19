@@ -248,6 +248,9 @@ if len(df_topics_only) > 0:
     
     # Ordenar por % negativo (mais negativo no topo)
     cross_filtered = cross_filtered.sort_values('negativo', ascending=True)
+    # Limitar heatmap aos top 25 tópicos por volume
+    top_topics = df_topics_only['topic_name'].value_counts().head(25).index
+    cross_filtered = cross_filtered[cross_filtered.index.isin(top_topics)]
     
     # Criar heatmap com Plotly
     fig_heat = go.Figure(data=go.Heatmap(
@@ -306,6 +309,78 @@ if len(df_topics_only) > 0:
 
 st.markdown('---')
 
+# ================================================
+# LINHA 3.5: Tópicos por Sessão (heatmap temporal)
+# ================================================
+
+st.subheader('Tópicos por Sessão')
+st.markdown('*Quantos segmentos de cada tópico aparecem em cada sessão.*')
+
+if len(df_topics_only) > 0:
+    temporal = pd.crosstab(
+        df_filtered[df_filtered['topic_id'] > 0]['data_sessao'].dt.strftime('%d/%m'),
+        df_filtered[df_filtered['topic_id'] > 0]['topic_name']
+    )
+    
+    top_15 = temporal.sum().nlargest(15).index
+    temporal = temporal[top_15]
+    
+    fig_temporal = go.Figure(data=go.Heatmap(
+        z=temporal.values,
+        x=temporal.columns,
+        y=temporal.index,
+        colorscale='YlOrRd',
+        text=temporal.values,
+        texttemplate='%{text}',
+        textfont={'size': 10},
+    ))
+    
+    fig_temporal.update_layout(
+        height=350,
+        xaxis_tickangle=-45,
+        xaxis_side='top',
+    )
+    
+    st.plotly_chart(fig_temporal, use_container_width=True)
+
+
+st.markdown('---')
+
+# ===================================================
+# LINHA 3.7: Distribuição de confiança por sentimento
+# ===================================================
+
+st.subheader('Confiança do Modelo por Sentimento')
+
+col_conf_left, col_conf_right = st.columns(2)
+
+with col_conf_left:
+    fig_conf = px.histogram(
+        df_filtered,
+        x='confianca',
+        color='sentimento',
+        color_discrete_map=color_map,
+        nbins=20,
+        barmode='overlay',
+        opacity=0.7,
+        labels={'confianca': 'Confiança', 'count': 'Segmentos'},
+    )
+    fig_conf.update_layout(height=350, xaxis_tickformat='.0%')
+    st.plotly_chart(fig_conf, use_container_width=True)
+
+with col_conf_right:
+    # Confiança média por sentimento
+    conf_by_sent = df_filtered.groupby('sentimento')['confianca'].agg(['mean', 'median', 'count'])
+    conf_by_sent.columns = ['Média', 'Mediana', 'Segmentos']
+    conf_by_sent = conf_by_sent.round(3)
+    st.dataframe(conf_by_sent, use_container_width=True)
+    
+    # Segmentos de baixa confiança
+    low_conf = df_filtered[df_filtered['confianca'] < 0.5]
+    st.metric('Segmentos com confiança < 50%', f'{len(low_conf):,} ({len(low_conf)/len(df_filtered):.0%})')
+
+
+st.markdown('---')
 
 # ============================================================
 #             LINHA 4: Explorador de segmentos
