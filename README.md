@@ -1,13 +1,18 @@
 # Análise de Sentimento em Discursos Legislativos
 
+
 Pipeline de análise automatizada de sentimento e tópicos em sessões plenárias da Câmara Municipal de São Paulo, utilizando técnicas de Processamento de Linguagem Natural (NLP - *Natural Language Processing*) e Aprendizado de Máquina.
+<br>
 
-
-![badge](https://img.shields.io/badge/status-in%20progress-yellow)
-[![GitHub forks](https://img.shields.io/github/forks/Naereen/StrapDown.js.svg?style=social&label=Fork&maxAge=2592000)](https://github.com/cintia-shinoda/legislative-nlp-pipeline) [![GitHub stars](https://img.shields.io/github/stars/Naereen/StrapDown.js.svg?style=social&label=Star&maxAge=2592000)](https://github.com/cintia-shinoda/legislative-nlp-pipeline/stargazers/)
-
+<p align="center">
+  <img src= "https://img.shields.io/badge/status-in%20progress-yellow" alt="Status do Projeto" />
+  <img src="https://img.shields.io/github/last-commit/cintia-shinoda/puc-rio_agents-repo" alt="GitHub Last Commit" />
+  <img src="https://img.shields.io/github/forks/cintia-shinoda/puc-rio_agents-repo" alt="GitHub Forks" />
+  <img src="https://img.shields.io/github/stars/cintia-shinoda/puc-rio_agents-repo" alt="GitHub Stars" />
+</p>
 
 ---
+
 
 ## Arquitetura
 
@@ -50,23 +55,23 @@ legislative-nlp-pipeline
 
 ## Pipeline
 ```bash
-┌─────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-│   yt-dlp    │───▶│faster-whisper│───▶│   spaCy      │───▶│  BERTimbau   │
-│  (download) │    │ (transcrição)│    │  (limpeza)   │    │ (sentimento) │
-│             │    │              │    │              │    │              │
-│ URL → .wav  │    │ .wav → texto │    │ texto bruto  │    │ texto limpo  │
-│             │    │              │    │  → limpo     │    │  → score     │
-└─────────────┘    └──────────────┘    └──────────────┘    └──────────────┘
-                                                                  │
-                                            ┌─────────────────────┘
-                                            ▼
-                                     ┌──────────────┐    ┌──────────────┐
-                                     │  BERTopic    │───▶│  Streamlit   │
-                                     │  (tópicos)   │    │ (dashboard)  │
-                                     │              │    │              │
-                                     │ textos →     │    │ dados →      │
-                                     │  clusters    │    │  gráficos    │
-                                     └──────────────┘    └──────────────┘
+        ┌─────────────┐    ┌──────────────┐    ┌──────────────┐
+        │   yt-dlp    │    │faster-whisper│    │    spaCy     │
+        │  (download) │    │ (transcrição)│    │  (limpeza)   │
+        │             │───▶│              │───▶│              │
+        │ URL → .wav  │    │ .wav → texto │    │ texto bruto  │
+        │             │    │              │    │  → limpo     │
+        └─────────────┘    └──────────────┘    └──────────────┘
+                                                       │                
+                                                       │                  
+                                                       ▼                  
+        ┌─────────────┐    ┌──────────────┐    ┌──────────────┐    
+        │  Streamlit  │◀───│   BERTopic   │◀───│  BERTimbau   │
+        │ (dashboard) │    │  (tópicos)   │    │ (sentimento) │                     
+        │             │    │              │    │              │
+        │   dados →   │    │   textos →   │    │ texto limpo  │
+        │  gráficos   │    │  clusters    │    │  → score     │
+        └─────────────┘    └──────────────┘    └──────────────┘
 ```
 
 ---
