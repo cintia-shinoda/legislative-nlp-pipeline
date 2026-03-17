@@ -6,9 +6,9 @@ Pipeline de análise automatizada de sentimento e tópicos em sessões plenária
 
 <p align="center">
   <img src= "https://img.shields.io/badge/status-in%20progress-yellow" alt="Status do Projeto" />
-  <img src="https://img.shields.io/github/last-commit/cintia-shinoda/puc-rio_agents-repo" alt="GitHub Last Commit" />
-  <img src="https://img.shields.io/github/forks/cintia-shinoda/puc-rio_agents-repo" alt="GitHub Forks" />
-  <img src="https://img.shields.io/github/stars/cintia-shinoda/puc-rio_agents-repo" alt="GitHub Stars" />
+  <img src="https://img.shields.io/github/last-commit/cintia-shinoda/legislative-nlp-pipeline" alt="GitHub Last Commit" />
+  <img src="https://img.shields.io/github/forks/cintia-shinoda/legislative-nlp-pipeline" alt="GitHub Forks" />
+  <img src="https://img.shields.io/github/stars/cintia-shinoda/legislative-nlp-pipeline" alt="GitHub Stars" />
 </p>
 
 ---
