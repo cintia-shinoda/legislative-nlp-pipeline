@@ -5,7 +5,6 @@ Pipeline de análise automatizada de sentimento e tópicos em sessões plenária
 ## Arquitetura
 
 ```bash
-## Stack
 legislative-nlp-pipeline
 ├── data/
 │   ├── output/
@@ -46,9 +45,16 @@ legislative-nlp-pipeline
 
 ## Como executar o projeto
 1. Clone o repositório:
+```bash
+git clone https://github.com/cintia-shinoda/legislative-nlp-pipeline.git
+```
 
 2. Entre na pasta do projeto:
+```bash
+cd legislative-nlp-pipeline
+```
 
 3. Instale as dependências:
-
-4. Execute:
+```bash
+pip install -r requirements.txt
+```
